@@ -1,8 +1,14 @@
 import React from "react";
 import ReactDOM from "react-dom";
 import CryptoJS from "crypto-js";
+//import Dropzone from "./components/Dropzone/Dropzone";
+
+import Dropzone from "./components/Dropzone/BasicDropzone";
+
+import Button from "react-bootstrap/Button";
 
 import "./styles.css";
+import "bootstrap/dist/css/bootstrap.css";
 
 class App extends React.Component {
   constructor(props) {
@@ -45,19 +51,28 @@ class App extends React.Component {
   }
 
   render() {
-    console.log("HASH", CryptoJS.SHA256("testing"));
-    console.log(CryptoJS.SHA1("Message"));
+    //console.log("HASH", CryptoJS.SHA256("testing"));
     return (
-      <div className="App">
-        <h1>Hello CodeSandbox</h1>
-        <h2>Start editing to see some magic happen!</h2>
-
-        <input
-          id="file-input"
-          className="file-input"
-          type="file"
-          onChange={this.handleFileChange}
-        />
+      <div>
+        <nav className="navbar navbar-dark  bg-dark flex-md-nowrap p-0 mb-5 shadow">
+          <a className="navbar-brand col-sm-3 col-md-2 mr-0" href="#">
+            DOCPROOF
+          </a>
+          <ul className="navbar-nav px-3">
+            <li className="nav-item text-nowrap d-none d-sm-none d-sm-block">
+              <small>
+                <a className="nav-link" href="#">
+                  <span id="account" />
+                </a>
+              </small>
+            </li>
+          </ul>
+        </nav>
+        <div className="container">
+          <h1>Hello CodeSandbox</h1>
+          <h2>Start editing to see some magic happen!</h2>
+          <Dropzone />
+        </div>
       </div>
     );
   }
