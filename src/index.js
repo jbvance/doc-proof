@@ -1,7 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom";
 import CryptoJS from "crypto-js";
+import Web3 from "web3";
+import { DOCPROOF_ADDRESS, DOCPROOF_ABI } from "./contracts/config";
 //import Dropzone from "./components/Dropzone/Dropzone";
+
+import Spinner from "react-bootstrap/Spinner";
 
 import Dropzone from "./components/Dropzone/BasicDropzone";
 
@@ -14,40 +18,37 @@ class App extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      filePath: null,
-      file: null,
-      success: null,
-      error: null,
-      txHash: null,
-      buttonLoading: false
+      loading: false,
+      docProof: null,
+      account: null
     };
-    this.handleFileChange = this.handleFileChange.bind(this);
+
+    this.loadBlockchainData = this.loadBlockchainData.bind(this);
   }
 
-  handleFileChange() {
-    this.setState({
-      success: null,
-      error: null,
-      txHash: null,
-      buttonLoading: false
-    });
-    const { files } = document.getElementById("file-input");
-    console.log("FILES", files);
-
-    if (files.length > 0) {
-      const file = files[0];
-      const reader = new FileReader();
-      const filePath = window.URL.createObjectURL(files[0]);
-      this.setState({ filePath, file: files[0] });
-
-      reader.onloadend = function(f) {
-        var file_result = this.result; // this == reader, get the loaded file "result"
-        var file_wordArr = CryptoJS.lib.WordArray.create(file_result); //convert blob to WordArray , see https://code.google.com/p/crypto-js/issues/detail?id=67
-        var sha256_hash = CryptoJS.SHA256(file_wordArr); //calculate SHA1 hash
-        alert("Calculated SHA256:" + sha256_hash.toString()); //output result
-      };
-      reader.readAsArrayBuffer(file); //read file as ArrayBuffer
+  async componentDidMount() {
+    try {
+      this.setState({ loading: true });
+      await this.loadBlockchainData();
+      this.setState({ loading: false });
+    } catch (err) {
+      console.log(err);
+      this.setState({ loading: false });
     }
+  }
+
+  async loadBlockchainData() {
+    const web3 = new Web3(Web3.givenProvider || "localhost:7545");
+    const network = await web3.eth.net.getNetworkType();
+    console.log("network:", network);
+    const accounts = await web3.eth.getAccounts();
+    console.log("accounts", accounts);
+    this.setState({ account: accounts[0] });
+    const docProof = new web3.eth.Contract(DOCPROOF_ABI, DOCPROOF_ADDRESS);
+    console.log("doc", docProof);
+    this.setState({ docProof });
+    const currentFileIndex = await docProof.methods.currentFileIndex().call();
+    console.log("currentFileIndex", currentFileIndex);
   }
 
   render() {
@@ -71,7 +72,16 @@ class App extends React.Component {
         <div className="container">
           <h1>Hello CodeSandbox</h1>
           <h2>Start editing to see some magic happen!</h2>
-          <Dropzone />
+          {this.state.loading ? (
+            <div>
+              <Spinner animation="border" role="status">
+                <span className="sr-only">Loading...</span>
+              </Spinner>
+              <span>...Loading</span>
+            </div>
+          ) : (
+            <Dropzone />
+          )}
         </div>
       </div>
     );
