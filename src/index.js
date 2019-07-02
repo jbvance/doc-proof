@@ -22,7 +22,8 @@ class App extends React.Component {
       loading: false,
       docProof: null,
       account: null,
-      files: []
+      files: [],
+      error: null
     };
 
     this.loadBlockchainData = this.loadBlockchainData.bind(this);
@@ -32,7 +33,7 @@ class App extends React.Component {
   async componentDidMount() {
     try {
       this.setState({ loading: true });
-      //await this.loadBlockchainData();
+      await this.loadBlockchainData();
       this.setState({ loading: false });
     } catch (err) {
       console.log(err);
@@ -46,38 +47,84 @@ class App extends React.Component {
     console.log("network:", network);
     const accounts = await web3.eth.getAccounts();
     console.log("accounts", accounts);
-    this.setState({ account: accounts[0] });
     const docProof = new web3.eth.Contract(DOCPROOF_ABI, DOCPROOF_ADDRESS);
-    console.log("doc", docProof);
-    this.setState({ docProof });
+    //console.log("doc", docProof);
+    this.setState({
+      docProof,
+      account: accounts[0]
+    });
     const currentFileIndex = await docProof.methods.currentFileIndex().call();
     console.log("currentFileIndex", currentFileIndex);
+    // window.ethereum.enable().then(accounts => {
+    //   const defaultAccount = accounts[0];
+    //   web3.eth.defaultAccount = defaultAccount;
+    //   this.setState({ account: defaultAccount }, () => {
+    //     console.log("ACCOUNT", this.state.account);
+    //   });
+    // });
   }
 
-  setupReader(file) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const file_result = reader.result;
-      //alert(file_result);
-      const file_wordArr = CryptoJS.lib.WordArray.create(file_result); //convert blob to WordArray , see https://code.google.com/p/crypto-js/issues/detail?id=67
-      const sha256_hash = CryptoJS.SHA256(file_wordArr); //calculate SHA1 hash
-      alert("Calculated SHA256:" + sha256_hash.toString()); //output result
-    };
-    reader.readAsArrayBuffer(file);
-  }
+  registerFiles(files) {}
 
-  CreateHashes() {
-    const { files } = this.state;
-    files.forEach(file => {
-      this.setupReader(file);
+  getFileHash(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const file_result = reader.result;
+        const file_wordArr = CryptoJS.lib.WordArray.create(file_result); //convert blob to WordArray , see https://code.google.com/p/crypto-js/issues/detail?id=67
+        const sha256_hash = CryptoJS.SHA256(file_wordArr); //calculate SHA1 hash
+        resolve(sha256_hash);
+      };
+      reader.readAsArrayBuffer(file);
     });
   }
 
+  async CreateHashes() {
+    const { files } = this.state;
+    console.log("FILES", files);
+    const filesWithHash = [...files];
+
+    try {
+      filesWithHash.forEach(file => {
+        this.getFileHash(file).then(hash => {
+          file["hash"] = hash.toString();
+          console.log("HASH IS: " + hash);
+          //console.log("CONTR", this.state.docProof.methods.registerFile());
+          this.state.docProof.methods
+            .registerFile(file.hash, file.name, file.lastModified)
+            .send({ from: this.state.account })
+            .then(() => console.log("DONE"))
+            .catch(err => console.log("ERROR", err));
+        });
+      });
+    } catch (err) {
+      console.log("ERROR: ", err);
+    }
+    console.log("FILES", filesWithHash);
+  }
+
   handleFileChange(files) {
+    this.setState({ error: null });
+    const MAX_FILES = 10;
     console.log("Files changed");
+    const numFiles = this.state.files.length;
+    if (numFiles + files.length > MAX_FILES) {
+      this.setState({
+        error: "Only 10 file hashes may be uploaded at one time"
+      });
+    }
+    const allowedNumFiles = MAX_FILES - numFiles;
+    if (allowedNumFiles <= 0) return;
+
+    let allowedFiles = [];
+    const numToAdd =
+      allowedNumFiles < files.length ? allowedNumFiles : files.length;
+    for (let i = 0; i < numToAdd; i++) {
+      allowedFiles.push(files[i]);
+    }
     this.setState(
       {
-        files: this.state.files.concat(files)
+        files: this.state.files.concat(allowedFiles)
       },
       () => console.log(this.state.files)
     );
@@ -94,7 +141,7 @@ class App extends React.Component {
           File Name: {file.name} <br />
           File Type: {file.type}
           <br />
-          Last Modified:{" "}
+          Last Modified: {file.lastModified}--
           {moment(file.lastModified).format("MM-DD-YYYY HH:mm:ss")}
         </Alert>
       </li>
@@ -110,7 +157,6 @@ class App extends React.Component {
 
   render() {
     //console.log("HASH", CryptoJS.SHA256("testing"));
-
     return (
       <div>
         <nav className="navbar navbar-dark  bg-dark flex-md-nowrap p-0 mb-5 shadow">
@@ -138,21 +184,28 @@ class App extends React.Component {
               <span>...Loading</span>
             </div>
           ) : (
-            <Dropzone onFileChange={this.handleFileChange} />
+            <div>
+              <Dropzone onFileChange={this.handleFileChange} />
+              {this.state.error && (
+                <Alert variant="danger" dismissible={false}>
+                  {this.state.error}
+                </Alert>
+              )}
+              <div className="file-list">
+                <h4>Files</h4>
+                {this.renderFileList()}
+              </div>
+              <div>
+                <Button
+                  disabled={this.state.files.length < 1}
+                  variant="primary"
+                  onClick={e => this.CreateHashes()}
+                >
+                  Upload File Hashes
+                </Button>
+              </div>
+            </div>
           )}
-          <div className="file-list">
-            <h4>Files</h4>
-            {this.renderFileList()}
-          </div>
-          <div>
-            <Button
-              disabled={this.state.files.length < 1}
-              variant="primary"
-              onClick={e => this.CreateHashes()}
-            >
-              Upload File Hashes
-            </Button>
-          </div>
         </div>
       </div>
     );

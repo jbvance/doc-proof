@@ -1,4 +1,6 @@
-export const DOCPROOF_ADDRESS = "0x5e63679e7d901bfd64041afe55d53e29ae687f26";
+// AT HOME - On Rinkeby export const DOCPROOF_ADDRESS = "0x5e63679e7d901bfd64041afe55d53e29ae687f26";
+//Below is for at office - on Rinkeby
+export const DOCPROOF_ADDRESS = "0x4585cc2b15eef6f486b48888109a4a2d3619719a";
 export const DOCPROOF_ABI = [
   {
     constant: false,
