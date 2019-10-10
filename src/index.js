@@ -23,7 +23,7 @@ class App extends React.Component {
       docProof: null,
       account: null,
       files: [],
-      error: null
+      error: []
     };
 
     this.loadBlockchainData = this.loadBlockchainData.bind(this);
@@ -48,7 +48,7 @@ class App extends React.Component {
     const accounts = await web3.eth.getAccounts();
     console.log("accounts", accounts);
     const docProof = new web3.eth.Contract(DOCPROOF_ABI, DOCPROOF_ADDRESS);
-    //console.log("doc", docProof);
+    console.log("doc", docProof);
     this.setState({
       docProof,
       account: accounts[0]
@@ -80,27 +80,46 @@ class App extends React.Component {
   }
 
   async CreateHashes() {
-    const { files } = this.state;
-    console.log("FILES", files);
-    const filesWithHash = [...files];
-
     try {
-      filesWithHash.forEach(file => {
-        this.getFileHash(file).then(hash => {
-          file["hash"] = hash.toString();
-          console.log("HASH IS: " + hash);
-          //console.log("CONTR", this.state.docProof.methods.registerFile());
-          this.state.docProof.methods
-            .registerFile(file.hash, file.name, file.lastModified)
-            .send({ from: this.state.account })
-            .then(() => console.log("DONE"))
-            .catch(err => console.log("ERROR", err));
-        });
+      this.setState({ error: [] });
+      const { files } = this.state;
+      console.log("FILES", files);
+      const filesWithHash = [...files];
+
+      filesWithHash.forEach(async file => {
+        const hash = await this.getFileHash(file);
+        file["hash"] = hash.toString();
+        console.log("HASH: " + hash);
+        console.log("GOT HERE IN CREATEHASH");
+        const fileExistsResult = await this.state.docProof.methods
+          .checkFileExists(file.hash)
+          .call();
+        if (fileExistsResult["fileExists"]) {
+          console.log("NOPE, FILE EXISTS");
+          this.setState({
+            error: [
+              ...this.state.error,
+              `The file hash for '${
+                file.name
+              }' has already been uploaded. Please remove it from the file list and try again.`
+            ]
+          });
+          return; // exit here, file already exists
+        }
+        this.state.docProof.methods
+          .registerFile(file.hash, file.name, file.lastModified)
+          .send({ from: this.state.account })
+          .then(() => console.log("DONE"))
+          .catch(err => {
+            console.error("ERROR", err.message);
+            this.setState({ error: err.message });
+          });
+
+        console.log("FILES", filesWithHash);
       });
     } catch (err) {
-      console.log("ERROR: ", err);
+      console.error("ERROR: ", err);
     }
-    console.log("FILES", filesWithHash);
   }
 
   handleFileChange(files) {
@@ -154,6 +173,11 @@ class App extends React.Component {
     );
     this.setState({ files: updatedFiles });
   }
+  j;
+
+  displayErrors() {
+    return this.state.error.map(err => <p>{err}</p>);
+  }
 
   render() {
     //console.log("HASH", CryptoJS.SHA256("testing"));
@@ -186,9 +210,9 @@ class App extends React.Component {
           ) : (
             <div>
               <Dropzone onFileChange={this.handleFileChange} />
-              {this.state.error && (
+              {this.state.error && this.state.error.length > 0 && (
                 <Alert variant="danger" dismissible={false}>
-                  {this.state.error}
+                  {this.displayErrors()}
                 </Alert>
               )}
               <div className="file-list">
